@@ -21,6 +21,7 @@ export default tseslint.config([
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['warn'],
+      'react-hooks/react-compiler': 'error',
     },
   },
 ])
