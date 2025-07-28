@@ -1,0 +1,1 @@
+This project is a Vite React TypeScript app with Tailwind CSS and Prettier (with Tailwind plugin) configured. ESLint is set to warn on unused variables. No Electron setup is included.
