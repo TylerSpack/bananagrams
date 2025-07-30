@@ -9,6 +9,16 @@ React Compiler is enabled in this project to optimize performance and reduce the
 ### ✅ Use Clean, Declarative Code  
 - Prefer simple, pure function components.
 - Avoid unnecessary abstractions or premature optimizations.
+- **Component Style Preference:**
+  - Use arrow function components (e.g., `const Tile = (props) => { ... }`).
+  - Prefer clear, readable, and composable component APIs.
+- **Variable Naming:**
+  - Use descriptive variable names. Avoid single-letter variable names except for loop counters (e.g., `i`, `j`).
+  - For array methods like `.map`, `.filter`, etc., use meaningful names (e.g., `tile`, `cell`, `row`) instead of `t`, `x`, etc.
+
+### 🗂️ Feature-Based Architecture
+- Organize code by feature, not by type. Each feature (e.g., `board`, `tile`) should have its own directory under `src/features/` containing all related components, types, and logic.
+- Keep feature logic isolated and composable. Cross-feature imports should be minimized and only occur through public APIs (e.g., index files or main component exports).
 
 ### 🧹 Avoid Manual Memoization (unless necessary)  
 - **Do not use** `useMemo`, `useCallback`, or `React.memo` unless profiling clearly shows a need.
