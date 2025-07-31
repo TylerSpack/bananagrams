@@ -95,22 +95,21 @@ export const TileRack: React.FC = () => {
       className="w-full bg-yellow-100 px-4 py-3"
     >
       <div className="flex items-center justify-between">
-        {/* Left Arrow */}
-        <button
-          onClick={goToPreviousPage}
-          disabled={currentPage === 0}
-          className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
-            currentPage === 0
-              ? 'text-gray-400 cursor-not-allowed'
-              : 'text-yellow-700 hover:bg-yellow-200 active:bg-yellow-300'
-          }`}
-          aria-label="Previous page"
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        
+        {/* Left Arrow or empty space */}
+        {currentPage === 0 ? (
+          <div className="h-10 w-10" />
+        ) : (
+          <button
+            onClick={goToPreviousPage}
+            className="flex h-10 w-10 items-center justify-center rounded-full transition text-yellow-700 hover:bg-yellow-200 active:bg-yellow-300"
+            aria-label="Previous page"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
         {/* Tile Grid - Always shows ROWS_PER_PAGE rows */}
         <div className="flex flex-col gap-2">
           {rows.map((row, rowIndex) => (
@@ -126,22 +125,21 @@ export const TileRack: React.FC = () => {
             </div>
           ))}
         </div>
-        
-        {/* Right Arrow */}
-        <button
-          onClick={goToNextPage}
-          disabled={currentPage >= totalPages - 1}
-          className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
-            currentPage >= totalPages - 1
-              ? 'text-gray-400 cursor-not-allowed'
-              : 'text-yellow-700 hover:bg-yellow-200 active:bg-yellow-300'
-          }`}
-          aria-label="Next page"
-        >
-          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+
+        {/* Right Arrow or empty space */}
+        {currentPage >= totalPages - 1 ? (
+          <div className="h-10 w-10" />
+        ) : (
+          <button
+            onClick={goToNextPage}
+            className="flex h-10 w-10 items-center justify-center rounded-full transition text-yellow-700 hover:bg-yellow-200 active:bg-yellow-300"
+            aria-label="Next page"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
       </div>
       
       {/* Page Indicator */}

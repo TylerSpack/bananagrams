@@ -43,7 +43,7 @@ export const BoardCell: React.FC<BoardCellProps> = ({
   return (
     <div
       ref={ref}
-      className="relative flex items-center justify-center border border-black/10 bg-gray-50 transition"
+      className="relative flex items-center justify-center border border-black/5 bg-gray-50 transition"
       style={{ width: BOARD_CELL_SIZE, height: BOARD_CELL_SIZE}}
     >
       {tileId ? <Tile tileId={tileId} letter={letter} size={BOARD_CELL_SIZE - 4} /> : null}

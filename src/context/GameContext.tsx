@@ -1,10 +1,9 @@
-
-import { createContext, useState } from "react";
+import { createContext, useState, useEffect } from "react";
 import type { TileType } from "../types/tile";
 
-// Temporary ID generator for testing
-const generateId = () => "asdf";
-
+const ALL_LETTERS = "JJKKQQXXZZBBBCCCFFFHHHMMMPPPVVVWWWYYYGGGGLLLLLDDDDDDSSSSSSUUUUUUNNNNNNNNTTTTTTTTTRRRRRRRRROOOOOOOOOOOIIIIIIIIIIIIAAAAAAAAAAAAAEEEEEEEEEEEEEEEEEE".split("");
+export const INITIAL_LETTER_POOL: TileType[] = ALL_LETTERS.map((letter, idx) => ({ id: `${letter}-${idx}`, letter }));
+const shuffleArray = <T,>(array: T[]): T[] => { const newArr = [...array]; for (let i = newArr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [newArr[i], newArr[j]] = [newArr[j], newArr[i]]; } return newArr; };
 
 export interface Player {
   id: string;
@@ -29,6 +28,8 @@ export interface GameContextProps {
   setBoardBounds: React.Dispatch<React.SetStateAction<BoardBounds>>;
   placeTileOnBoard: (playerId: string, x: number, y: number, tile: TileType) => void;
   moveTileToPlayerTiles: (playerId: string, tile: TileType) => void;
+  initializePlayer: (name: string) => void;
+  startGame: () => void;
 }
 
 export const GameContext = createContext<GameContextProps | undefined>(
@@ -44,32 +45,58 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     maxY: 12,
   });
 
-  const allLetters =
-    "JJKKQQXXZZBBBCCCFFFHHHMMMPPPVVVWWWYYYGGGGLLLLLDDDDDDSSSSSSUUUUUUNNNNNNNNTTTTTTTTTRRRRRRRRROOOOOOOOOOOIIIIIIIIIIIIAAAAAAAAAAAAAEEEEEEEEEEEEEEEEEE".split(
-      "",
-    );
-  const INITIAL_LETTER_POOL: TileType[] = allLetters.map((letter, idx) => ({
-    id: `${letter}-${idx}`,
-    letter,
-  }));
+  // Temporary ID generator for testing
+  const generateId = () => Math.random().toString(36).slice(2);
 
-  // For testing: create Bob with 21 tiles and a random id
-  const bobId = generateId();
-  //Shuffle the initial letter pool to give Bob a random set of tiles
-  INITIAL_LETTER_POOL.sort(() => Math.random() - 0.5);
-  const bobTiles = INITIAL_LETTER_POOL.slice(0, 21);
-  const bobBoard: BoardMap = {};
-  const [players, setPlayers] = useState<Player[]>([
-    {
-      id: bobId,
-      name: "Bob",
-      tiles: bobTiles,
-      board: bobBoard,
-    },
-  ]);
+  // Pool of remaining letters
+  const [letterPool, setLetterPool] = useState<TileType[]>(() => shuffleArray([...INITIAL_LETTER_POOL]));
 
-  // Store Bob's id for yourPlayerId
-  const yourPlayerId = bobId;
+  // Player state (add Bob for testing)
+  const [players, setPlayers] = useState<Player[]>(() => {
+    const shuffled = shuffleArray([...INITIAL_LETTER_POOL]);
+    const bobTiles = shuffled.slice(0, 21);
+    return [
+      {
+        id: "bob-id",
+        name: "Bob",
+        tiles: bobTiles,
+        board: {},
+      },
+    ];
+  });
+
+  // Set Bob as the initial yourPlayerId
+  // TODO: Replace with actual player management logic
+  const [yourPlayerId, setYourPlayerId] = useState<string>("bob-id");
+
+
+  // Initialize a new player
+  const initializePlayer = (name: string) => {
+    const newPlayer: Player = { id: generateId(), name, tiles: [], board: {} };
+    setPlayers(prev => [...prev, newPlayer]);
+    // On first initialize, set as current player
+    // MAYBE reconsider this logic?
+    if (!yourPlayerId) setYourPlayerId(newPlayer.id);
+  };
+
+  // Start game by dealing 21 tiles to each player
+  const startGame = () => {
+    setPlayers(prevPlayers => {
+      const newPool = [...letterPool];
+      const updatedPlayers = prevPlayers.map(player => {
+        const initialPlayerTiles = newPool.splice(0, 21);
+        return { ...player, tiles: initialPlayerTiles, board: {} };
+      });
+      setLetterPool(newPool);
+      return updatedPlayers;
+    });
+  };
+
+  // Automatically start the game on mount
+  useEffect(() => {
+    startGame();
+  }, []);
+
 
   // Default empty space to maintain around the board
   const EMPTY_SPACE = 2;
@@ -144,6 +171,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setBoardBounds,
         placeTileOnBoard,
         moveTileToPlayerTiles,
+        initializePlayer,
+        startGame,
       }}
     >
       {children}
