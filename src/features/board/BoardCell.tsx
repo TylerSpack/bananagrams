@@ -21,33 +21,29 @@ export const BoardCell: React.FC<BoardCellProps> = ({
   const ref = useRef<HTMLDivElement>(null);
   const game = useContext(GameContext);
   if (!game) throw new Error("GameContext not found");
-  const { setTiles, placeTileOnBoard } = game;
+  const { yourPlayerId, placeTileOnBoard } = game;
 
   // Drop target for the cell
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    // If a tile is already placed, we don't need to set up a drop target (prevents overwriting an existing tile)
+    if (!el || tileId) return;
     const cleanup = dropTargetForElements({
       element: el,
       onDrop: ({ source }) => {
         const droppedTile = source.data as TileType | undefined;
-        if (!droppedTile) return; // This should not happen, but just in case
+        if (droppedTile === undefined) throw new Error("Dropped tile data was not available - this shouldn't happen.");
 
-        placeTileOnBoard(col, row, droppedTile);
-        //MAYBE don't need to do this every time since a tile may come from the board
-        setTiles((prevTiles) =>
-          prevTiles.filter((tile) => tile.id !== droppedTile.id),
-        );
+        placeTileOnBoard(yourPlayerId, col, row, droppedTile);
       },
-      canDrop: () => !tileId,
     });
     return cleanup;
-  }, [tileId, row, col, placeTileOnBoard, setTiles]);
+  }, [tileId, row, col, placeTileOnBoard, yourPlayerId]);
 
   return (
     <div
       ref={ref}
-      className="relative flex items-center justify-center border border-black/10 bg-green-50 transition"
+      className="relative flex items-center justify-center border border-black/10 bg-gray-50 transition"
       style={{ width: BOARD_CELL_SIZE, height: BOARD_CELL_SIZE}}
     >
       {tileId ? <Tile tileId={tileId} letter={letter} size={BOARD_CELL_SIZE - 4} /> : null}

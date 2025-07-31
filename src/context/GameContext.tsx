@@ -1,7 +1,17 @@
+
 import { createContext, useState } from "react";
 import type { TileType } from "../types/tile";
 
-export type BoardMap = Record<string, TileType | null>;
+// Temporary ID generator for testing
+const generateId = () => "asdf";
+
+
+export interface Player {
+  id: string;
+  name: string;
+  tiles: TileType[];
+  board: BoardMap;
+}
 
 export interface BoardBounds {
   minX: number;
@@ -10,22 +20,22 @@ export interface BoardBounds {
   maxY: number;
 }
 
+export type BoardMap = Record<string, TileType | null>;
+
 export interface GameContextProps {
-  board: BoardMap;
-  tiles: TileType[];
-  setTiles: React.Dispatch<React.SetStateAction<TileType[]>>;
+  players: Player[];
+  yourPlayerId: string;
   boardBounds: BoardBounds;
   setBoardBounds: React.Dispatch<React.SetStateAction<BoardBounds>>;
-  placeTileOnBoard: (x: number, y: number, tile: TileType) => void;
+  placeTileOnBoard: (playerId: string, x: number, y: number, tile: TileType) => void;
+  moveTileToPlayerTiles: (playerId: string, tile: TileType) => void;
 }
 
 export const GameContext = createContext<GameContextProps | undefined>(
   undefined,
 );
 
-export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Board bounds (inclusive)
   const [boardBounds, setBoardBounds] = useState<BoardBounds>({
     minX: -12,
@@ -34,24 +44,38 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
     maxY: 12,
   });
 
-  const letterPool =
+  const allLetters =
     "JJKKQQXXZZBBBCCCFFFHHHMMMPPPVVVWWWYYYGGGGLLLLLDDDDDDSSSSSSUUUUUUNNNNNNNNTTTTTTTTTRRRRRRRRROOOOOOOOOOOIIIIIIIIIIIIAAAAAAAAAAAAAEEEEEEEEEEEEEEEEEE".split(
       "",
     );
-  const INITIAL_TILES: TileType[] = letterPool.map((letter, idx) => ({
+  const INITIAL_LETTER_POOL: TileType[] = allLetters.map((letter, idx) => ({
     id: `${letter}-${idx}`,
     letter,
   }));
-  const [tiles, setTiles] = useState<TileType[]>(INITIAL_TILES);
 
-  // Board is a sparse object: only set keys for occupied cells
-  const [board, setBoard] = useState<BoardMap>({});
+  // For testing: create Bob with 21 tiles and a random id
+  const bobId = generateId();
+  //Shuffle the initial letter pool to give Bob a random set of tiles
+  INITIAL_LETTER_POOL.sort(() => Math.random() - 0.5);
+  const bobTiles = INITIAL_LETTER_POOL.slice(0, 21);
+  const bobBoard: BoardMap = {};
+  const [players, setPlayers] = useState<Player[]>([
+    {
+      id: bobId,
+      name: "Bob",
+      tiles: bobTiles,
+      board: bobBoard,
+    },
+  ]);
+
+  // Store Bob's id for yourPlayerId
+  const yourPlayerId = bobId;
 
   // Default empty space to maintain around the board
   const EMPTY_SPACE = 2;
 
-  // Place a tile and expand the board if needed
-  const placeTileOnBoard = (x: number, y: number, tile: TileType) => {
+  // Place a tile for a specific player and expand the board if needed
+  const placeTileOnBoard = (playerId: string, x: number, y: number, tile: TileType) => {
     setBoardBounds((prev) => {
       let { minX, maxX, minY, maxY } = prev;
       // X axis
@@ -72,28 +96,54 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       return { minX, maxX, minY, maxY };
     });
-    setBoard((prev) => {
-      // Remove the tile from any previous board cell using delete
-      const newBoard = { ...prev };
-      for (const key in newBoard) {
-        if (newBoard[key]?.id === tile.id) {
-          delete newBoard[key];
+    setPlayers((prevPlayers) => {
+      return prevPlayers.map((player) => {
+        if (player.id !== playerId) return player;
+        // Remove the tile from any previous board cell
+        const newBoard = { ...player.board };
+        for (const key in newBoard) {
+          if (newBoard[key]?.id === tile.id) {
+            delete newBoard[key];
+          }
         }
-      }
-      newBoard[`${x},${y}`] = tile;
-      return newBoard;
+        newBoard[`${x},${y}`] = tile;
+        // Remove the tile from the player's tiles
+        const newTiles = player.tiles.filter((t) => t.id !== tile.id);
+        return { ...player, board: newBoard, tiles: newTiles };
+      });
+    });
+  };
+
+  // Move a tile from the board back to the player's tile rack
+  const moveTileToPlayerTiles = (playerId: string, tile: TileType) => {
+    setPlayers((prevPlayers) => {
+      return prevPlayers.map((player) => {
+        if (player.id !== playerId) return player;
+        // Check if the tile exists on the board
+        const boardKey = Object.keys(player.board).find(
+          (key) => player.board[key]?.id === tile.id
+        );
+        if (!boardKey) {
+          // Tile is not on the board, do nothing
+          return player;
+        }
+        // Remove from board and add to tiles
+        const newBoard = { ...player.board };
+        delete newBoard[boardKey];
+        return { ...player, board: newBoard, tiles: [...player.tiles, tile] };
+      });
     });
   };
 
   return (
     <GameContext.Provider
       value={{
-        board,
-        tiles,
-        setTiles,
+        players,
+        yourPlayerId,
         boardBounds,
         setBoardBounds,
         placeTileOnBoard,
+        moveTileToPlayerTiles,
       }}
     >
       {children}

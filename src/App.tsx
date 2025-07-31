@@ -23,7 +23,7 @@ const App = () => {
 
   return (
     <GameProvider>
-      <div className="flex h-screen w-screen flex-col margin-auto">
+      <div className="flex h-screen w-screen flex-col margin-auto bg-gray-50">
         <h1 className="my-2 text-3xl font-bold text-yellow-700 drop-shadow text-center">
           Bananagrams
         </h1>

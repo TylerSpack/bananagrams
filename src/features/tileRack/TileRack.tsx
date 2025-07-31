@@ -1,5 +1,7 @@
 import { Tile } from "../tile/Tile";
 import { useContext, useState, useRef, useEffect } from "react";
+import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import type { TileType } from "../../types/tile";
 import { GameContext } from "../../context/GameContext";
 
 const TILE_SIZE = 48; // Fixed tile size in pixels (h-12 w-12 equivalent)
@@ -10,7 +12,9 @@ const HORIZONTAL_PADDING = 32; // px-4 = 16px on each side
 export const TileRack: React.FC = () => {
   const game = useContext(GameContext);
   if (!game) throw new Error("GameContext not found");
-  const { tiles } = game;
+  const { players, yourPlayerId, moveTileToPlayerTiles } = game;
+  const tiles = players.find((p) => p.id === yourPlayerId)?.tiles;
+  if (!tiles) throw new Error("Your player not found in GameContext");
   
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -20,6 +24,7 @@ export const TileRack: React.FC = () => {
   
   // Calculate how many tiles fit per row based on fixed tile size
   useEffect(() => {
+    // MAYBE make this more compact (square-like) for better UX with scanning the tiles
     const calculateTilesPerRow = () => {
       if (!containerRef.current) return;
       
@@ -69,8 +74,26 @@ export const TileRack: React.FC = () => {
     rows.push(rowTiles);
   }
   
+  // Set up droppable area for the tile rack
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const cleanup = dropTargetForElements({
+      element: el,
+      onDrop: ({ source }) => {
+        const droppedTile = source.data as TileType | undefined;
+        if (!droppedTile) return;
+        moveTileToPlayerTiles(yourPlayerId, droppedTile);
+      },
+    });
+    return cleanup;
+  }, [moveTileToPlayerTiles, yourPlayerId]);
+
   return (
-    <div ref={containerRef} className="w-full bg-yellow-100 px-4 py-3">
+    <div
+      ref={containerRef}
+      className="w-full bg-yellow-100 px-4 py-3"
+    >
       <div className="flex items-center justify-between">
         {/* Left Arrow */}
         <button
