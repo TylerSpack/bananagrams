@@ -1,46 +1,14 @@
 import { create } from "zustand";
 import type { TileType } from "../types/tile";
-
-const EMPTY_CELLS_AROUND_BOARD = 2;
-const ALL_LETTERS =
-  "JJKKQQXXZZBBBCCCFFFHHHMMMPPPVVVWWWYYYGGGGLLLLLDDDDDDSSSSSSUUUUUUNNNNNNNNTTTTTTTTTRRRRRRRRROOOOOOOOOOOIIIIIIIIIIIIAAAAAAAAAAAAAEEEEEEEEEEEEEEEEEE".split(
-    "",
-  );
-export const INITIAL_LETTER_POOL: TileType[] = ALL_LETTERS.map(
-  (letter, idx) => ({ id: `${letter}-${idx}`, letter }),
-);
-const shuffleArray = <T>(array: T[]): T[] => {
-  const newArr = [...array];
-  for (let i = newArr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-  }
-  return newArr;
-};
-const generateId = () => Math.random().toString(36).slice(2);
-
-export interface Player {
-  id: string;
-  name: string;
-  tiles: TileType[];
-  board: BoardMap;
-}
-
-export interface BoardBounds {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-}
-
-export type BoardMap = Record<string, TileType | null>;
+import type { BoardBounds, Player } from "../types/game";
+import { generateId, shuffleArray } from "../utils/utils";
+import { EMPTY_CELLS_AROUND_BOARD, INITIAL_LETTER_POOL } from "./gameConstants";
 
 interface GameState {
   players: Player[];
   yourPlayerId: string;
   boardBounds: BoardBounds;
   letterPool: TileType[];
-  setBoardBounds: (bounds: BoardBounds) => void;
   placeTileOnBoard: (
     playerId: string,
     x: number,
@@ -60,13 +28,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     {
       id: "bob-id",
       name: "Bob",
-      tiles: [], // Bob starts with no tiles
+      tiles: [],
       board: {},
     },
   ],
   yourPlayerId: "bob-id",
-
-  setBoardBounds: (bounds) => set({ boardBounds: bounds }),
 
   // Tile goes from your tiles -> your board
   placeTileOnBoard: (playerId, x, y, tile) => {
@@ -111,7 +77,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         const tilePositionKey = Object.keys(player.board).find(
           (key) => player.board[key]?.id === tile.id,
         );
-        if (!tilePositionKey) throw new Error("Tile not found on board - this shouldn't happen");
+        if (!tilePositionKey)
+          throw new Error("Tile not found on board - this shouldn't happen");
         const newBoard = { ...player.board };
         delete newBoard[tilePositionKey];
         return { ...player, board: newBoard, tiles: [...player.tiles, tile] };
@@ -132,8 +99,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     set((state) => {
       const newPool = [...state.letterPool];
       const updatedPlayers = state.players.map((player) => {
-        // Can take the first 21 tiles from the pool since the pool is shuffled
-        const initialPlayerTiles = newPool.splice(0, 21);
+        // Can take tiles from the start of the pool since the pool is shuffled
+        const initialTileCount = 21;
+        const initialPlayerTiles = newPool.splice(0, initialTileCount);
         return { ...player, tiles: initialPlayerTiles };
       });
       return { players: updatedPlayers, letterPool: newPool };
