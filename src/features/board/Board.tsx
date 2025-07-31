@@ -1,16 +1,15 @@
 import { BoardCell } from "./BoardCell";
-import { useContext } from "react";
-import { GameContext } from "../../context/GameContext";
+import { useGameStore } from "../../store/gameStore";
 
 export const Board: React.FC = () => {
-
-  const game = useContext(GameContext);
-  if (!game) throw new Error("GameContext not found");
-  const { players, yourPlayerId, boardBounds } = game;
-  const board = players.find((p) => p.id === yourPlayerId)?.board;
-  if (!board) throw new Error("Your player not found in GameContext");
+  const yourPlayerId = useGameStore((state) => state.yourPlayerId);
+  const boardBounds = useGameStore((state) => state.boardBounds);
   const { minX, maxX, minY, maxY } = boardBounds;
-
+  const board = useGameStore(
+    (state) => state.players.find((p) => p.id === yourPlayerId)?.board,
+  );
+  if (!board) throw new Error("Your player not found in game store");
+  
   const rows = [];
   for (let y = minY; y <= maxY; y++) {
     const cells = [];

@@ -8,7 +8,11 @@ export type TileComponentProps = {
   size?: number; // Optional size prop in pixels
 };
 
-export const Tile: React.FC<TileComponentProps> = ({ tileId, letter, size = 48 }) => {
+export const Tile: React.FC<TileComponentProps> = ({
+  tileId,
+  letter,
+  size = 48,
+}) => {
   const draggableRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -29,7 +33,7 @@ export const Tile: React.FC<TileComponentProps> = ({ tileId, letter, size = 48 }
   return (
     <div
       ref={draggableRef}
-      className="flex flex-shrink-0 cursor-grab items-center justify-center rounded border-2 border-gray-300 bg-white text-black font-bold shadow-lg transition select-none hover:bg-gray-100"
+      className="flex flex-shrink-0 cursor-grab items-center justify-center rounded border-2 border-gray-300 bg-white font-bold text-black shadow-lg transition select-none hover:bg-gray-100"
       style={{
         width: `${size}px`,
         height: `${size}px`,

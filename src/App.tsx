@@ -1,13 +1,16 @@
 import { Board } from "./features/board/Board";
 import { TileRack } from "./features/tileRack/TileRack";
-
-import { GameProvider } from "./context/GameContext";
-
-
 import { useRef, useEffect } from "react";
+import { useGameStore } from "./store/gameStore";
 
 const App = () => {
   const boardContainerRef = useRef<HTMLDivElement>(null);
+
+  // TODO Get rid of calling startGame on mount
+  const startGame = useGameStore((state) => state.startGame);
+  useEffect(() => {
+    startGame();
+  }, []);
 
   useEffect(() => {
     const container = boardContainerRef.current;
@@ -22,20 +25,18 @@ const App = () => {
   }, []);
 
   return (
-    <GameProvider>
-      <div className="flex h-screen w-screen flex-col margin-auto bg-gray-50">
-        <h1 className="my-2 text-3xl font-bold text-yellow-700 drop-shadow text-center">
-          Bananagrams
-        </h1>
-        <div
-          ref={boardContainerRef}
-          className="flex-1 overflow-scroll scrollbar-hide p-4"
-        >
-          <Board />
-        </div>
-        <TileRack />
+    <div className="margin-auto flex h-screen w-screen flex-col bg-gray-50">
+      <h1 className="my-2 text-center text-3xl font-bold text-yellow-700 drop-shadow">
+        Bananagrams
+      </h1>
+      <div
+        ref={boardContainerRef}
+        className="scrollbar-hide flex-1 overflow-scroll p-4"
+      >
+        <Board />
       </div>
-    </GameProvider>
+      <TileRack />
+    </div>
   );
 };
 

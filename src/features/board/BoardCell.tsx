@@ -1,9 +1,9 @@
-import { useRef, useEffect, useContext } from "react";
+import { useRef, useEffect } from "react";
 const BOARD_CELL_SIZE = 48;
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-import { GameContext } from "../../context/GameContext";
 import { Tile } from "../tile/Tile";
 import type { TileType } from "../../types/tile";
+import { useGameStore } from "../../store/gameStore";
 
 export interface BoardCellProps {
   row: number;
@@ -19,9 +19,8 @@ export const BoardCell: React.FC<BoardCellProps> = ({
   letter,
 }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const game = useContext(GameContext);
-  if (!game) throw new Error("GameContext not found");
-  const { yourPlayerId, placeTileOnBoard } = game;
+  const yourPlayerId = useGameStore((state) => state.yourPlayerId);
+  const placeTileOnBoard = useGameStore((state) => state.placeTileOnBoard);
 
   // Drop target for the cell
   useEffect(() => {
@@ -32,7 +31,10 @@ export const BoardCell: React.FC<BoardCellProps> = ({
       element: el,
       onDrop: ({ source }) => {
         const droppedTile = source.data as TileType | undefined;
-        if (droppedTile === undefined) throw new Error("Dropped tile data was not available - this shouldn't happen.");
+        if (droppedTile === undefined)
+          throw new Error(
+            "Dropped tile data was not available - this shouldn't happen.",
+          );
 
         placeTileOnBoard(yourPlayerId, col, row, droppedTile);
       },
@@ -44,9 +46,11 @@ export const BoardCell: React.FC<BoardCellProps> = ({
     <div
       ref={ref}
       className="relative flex items-center justify-center border border-black/5 bg-gray-50 transition"
-      style={{ width: BOARD_CELL_SIZE, height: BOARD_CELL_SIZE}}
+      style={{ width: BOARD_CELL_SIZE, height: BOARD_CELL_SIZE }}
     >
-      {tileId ? <Tile tileId={tileId} letter={letter} size={BOARD_CELL_SIZE - 4} /> : null}
+      {tileId ? (
+        <Tile tileId={tileId} letter={letter} size={BOARD_CELL_SIZE - 4} />
+      ) : null}
     </div>
   );
 };
