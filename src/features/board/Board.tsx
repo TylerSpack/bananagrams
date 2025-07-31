@@ -29,11 +29,5 @@ export const Board: React.FC = () => {
       </div>,
     );
   }
-  return (
-    <div className="overflow-scroll scrollbar-hide px-2 py-2 w-full h-full">
-      <div className="flex min-w-full w-max flex-col">
-        {rows}
-      </div>
-    </div>
-  );
+  return <div className="flex w-max min-w-full flex-col">{rows}</div>;
 };

@@ -28,10 +28,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   // Board bounds (inclusive)
   const [boardBounds, setBoardBounds] = useState<BoardBounds>({
-    minX: -4,
-    maxX: 4,
-    minY: -4,
-    maxY: 4,
+    minX: -12,
+    maxX: 12,
+    minY: -12,
+    maxY: 12,
   });
 
   const letterPool =
@@ -84,7 +84,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({
       return newBoard;
     });
   };
-
 
   return (
     <GameContext.Provider
