@@ -2,6 +2,7 @@ import { Board } from "./features/board/Board";
 import { TileRack } from "./features/tileRack/TileRack";
 import { useRef, useEffect } from "react";
 import { useGameStore } from "./store/gameStore";
+import { loadWordList } from "./utils/wordList";
 
 const App = () => {
   const boardContainerRef = useRef<HTMLDivElement>(null);
@@ -26,6 +27,7 @@ const App = () => {
         behavior: "auto",
       });
     }
+    loadWordList();
   }, []);
 
   return (
