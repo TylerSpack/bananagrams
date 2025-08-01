@@ -9,7 +9,7 @@ export const Board: React.FC = () => {
     (state) => state.players.find((p) => p.id === yourPlayerId)?.board,
   );
   if (!board) throw new Error("Your player not found in game store");
-  
+
   const rows = [];
   for (let y = minY; y <= maxY; y++) {
     const cells = [];
@@ -31,5 +31,7 @@ export const Board: React.FC = () => {
       </div>,
     );
   }
-  return <div className="flex w-max min-w-full flex-col items-center">{rows}</div>;
+  return (
+    <div className="flex w-max min-w-full flex-col items-center">{rows}</div>
+  );
 };

@@ -6,13 +6,18 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
 }
-@import 'tailwindcss';
+@import "tailwindcss";
 
-body, html {
+body,
+html {
   margin: 0;
   padding: 0;
 }
 
 * {
   box-sizing: border-box;
+}
+
+.test-border {
+  border: 1px solid red;
 }

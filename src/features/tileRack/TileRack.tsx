@@ -11,12 +11,15 @@ const HORIZONTAL_PADDING = 32; // px-4 = 16px on each side
 
 export const TileRack: React.FC = () => {
   const yourPlayerId = useGameStore((state) => state.yourPlayerId);
+  const peel = useGameStore((state) => state.peel);
+  const dump = useGameStore((state) => state.dump);
   const tiles = useGameStore(
     (state) => state.players.find((p) => p.id === yourPlayerId)?.tiles,
   );
   const moveTileToPlayerTiles = useGameStore(
     (state) => state.moveTileToPlayerTiles,
   );
+  const letterPool = useGameStore((state) => state.letterPool);
   if (!tiles) throw new Error("Your player not found in game store");
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,7 +81,7 @@ export const TileRack: React.FC = () => {
     rows.push(rowTiles);
   }
 
-  // Set up droppable area for the tile rack
+  // Set up droppable area for the tile rack (for moving tiles back to rack)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -93,86 +96,126 @@ export const TileRack: React.FC = () => {
     return cleanup;
   }, [moveTileToPlayerTiles, yourPlayerId]);
 
-  return (
-    <div ref={containerRef} className="w-full bg-yellow-100 px-4 py-3">
-      <div className="flex items-center justify-between">
-        {/* Left Arrow or empty space */}
-        {currentPage === 0 ? (
-          <div className="h-10 w-10" />
-        ) : (
-          <button
-            onClick={goToPreviousPage}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-yellow-700 transition hover:bg-yellow-200 active:bg-yellow-300"
-            aria-label="Previous page"
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-          </button>
-        )}
+  // Set up droppable area for dumping tiles
+  const dumpAreaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = dumpAreaRef.current;
+    if (!el) return;
+    const cleanup = dropTargetForElements({
+      element: el,
+      onDrop: ({ source }) => {
+        const droppedTile = source.data as TileType | undefined;
+        if (!droppedTile) return;
+        dump(yourPlayerId, droppedTile);
+      },
+    });
+    return cleanup;
+  }, [dump, yourPlayerId]);
 
-        {/* Tile Grid - Always shows ROWS_PER_PAGE rows */}
-        <div className="flex flex-col gap-2">
-          {rows.map((row, rowIndex) => (
-            <div
-              key={rowIndex}
-              className="flex justify-center gap-2"
-              style={{ minHeight: `${TILE_SIZE}px` }}
-            >
-              {row.map((tile) => (
-                <Tile
-                  key={tile.id}
-                  tileId={tile.id}
-                  letter={tile.letter}
-                  size={TILE_SIZE}
-                />
+  return (
+    <div className="w-full bg-yellow-100 px-4 py-3">
+      <div className="flex flex-col">
+        <div className="flex flex-col md:flex-row">
+          {/* Arrows and Tiles */}
+          <div
+            ref={containerRef}
+            className="flex flex-5/6 items-center justify-between"
+          >
+            {/* Left Arrow or empty space */}
+            {currentPage === 0 ? (
+              <div className="h-10 w-10" />
+            ) : (
+              <button
+                onClick={goToPreviousPage}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-yellow-700 transition hover:bg-yellow-200 active:bg-yellow-300"
+                aria-label="Previous page"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+            )}
+
+            {/* Tile Grid - Always shows ROWS_PER_PAGE rows */}
+            <div className="flex flex-col gap-2">
+              {rows.map((row, rowIndex) => (
+                <div
+                  key={rowIndex}
+                  className="flex justify-center gap-2"
+                  style={{ minHeight: `${TILE_SIZE}px` }}
+                >
+                  {row.map((tile) => (
+                    <Tile
+                      key={tile.id}
+                      tileId={tile.id}
+                      letter={tile.letter}
+                      size={TILE_SIZE}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
-          ))}
+
+            {/* Right Arrow or empty space */}
+            {currentPage >= totalPages - 1 ? (
+              <div className="h-10 w-10" />
+            ) : (
+              <button
+                onClick={goToNextPage}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-yellow-700 transition hover:bg-yellow-200 active:bg-yellow-300"
+                aria-label="Next page"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+          {/* Peel and Dump area */}
+          <div className="flex flex-row gap-2 mt-2 md:flex-col md:items-center md:justify-center">
+            <button
+              className="rounded bg-green-500 px-3 py-1 font-semibold text-white transition hover:bg-green-600"
+              onClick={() => peel(yourPlayerId)}
+            >
+              Peel
+            </button>
+            <div
+              ref={dumpAreaRef}
+              className="flex flex-1 flex-col items-center justify-center rounded-lg border-2 border-dashed border-black/30 bg-black/10 p-2 text-center"
+            >
+              <span>Tiles remaining: {letterPool.length}</span>
+              <span>{"(Drag here to dump)"}</span>
+            </div>
+          </div>
         </div>
 
-        {/* Right Arrow or empty space */}
-        {currentPage >= totalPages - 1 ? (
-          <div className="h-10 w-10" />
-        ) : (
-          <button
-            onClick={goToNextPage}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-yellow-700 transition hover:bg-yellow-200 active:bg-yellow-300"
-            aria-label="Next page"
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </button>
+        {/* Page Indicator (conditional) */}
+        {totalPages > 1 && (
+          <div className="my-2 text-center text-sm text-yellow-700">
+            Page {currentPage + 1} of {totalPages}
+          </div>
         )}
       </div>
-
-      {/* Page Indicator */}
-      {totalPages > 1 && (
-        <div className="mt-2 text-center text-sm text-yellow-700">
-          Page {currentPage + 1} of {totalPages}
-        </div>
-      )}
     </div>
   );
 };

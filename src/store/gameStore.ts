@@ -80,8 +80,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           (key) => player.board[key]?.id === tile.id,
         );
         // If tile is not on the board, it may be coming from the tile rack
-        if (!tilePositionKey)
-          return player; // No change if tile not found on board
+        if (!tilePositionKey) return player; // No change if tile not found on board
         const updatedBoard = { ...player.board };
         delete updatedBoard[tilePositionKey];
         return {
@@ -107,7 +106,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const updatedLetterPool = [...state.letterPool];
       const updatedPlayers = state.players.map((player) => {
         // Can take tiles from the start of the pool since the pool is shuffled
-        const initialTileCount = 3;
+        const initialTileCount = 21;
         const initialPlayerTiles = updatedLetterPool.splice(
           0,
           initialTileCount,
