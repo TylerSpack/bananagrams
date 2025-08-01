@@ -31,5 +31,5 @@ export const Board: React.FC = () => {
       </div>,
     );
   }
-  return <div className="flex w-max min-w-full flex-col">{rows}</div>;
+  return <div className="flex w-max min-w-full flex-col items-center">{rows}</div>;
 };

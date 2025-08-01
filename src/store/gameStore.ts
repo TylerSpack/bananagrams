@@ -18,6 +18,8 @@ interface GameState {
   moveTileToPlayerTiles: (playerId: string, tile: TileType) => void;
   initializePlayer: (name: string) => void;
   startGame: () => void;
+  peel: (playerId: string) => void;
+  dump: (playerId: string, tile: TileType) => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -53,18 +55,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       boardBounds: { minX, maxX, minY, maxY },
       players: players.map((player) => {
         if (player.id !== playerId) return player;
-        const newBoard = { ...player.board };
-        for (const tilePositionKey in newBoard) {
-          if (newBoard[tilePositionKey]?.id === tile.id) {
-            delete newBoard[tilePositionKey];
+        const updatedBoard = { ...player.board };
+        for (const tilePositionKey in updatedBoard) {
+          if (updatedBoard[tilePositionKey]?.id === tile.id) {
+            delete updatedBoard[tilePositionKey];
             break; // Only one tile on the board should have a matching ID
           }
         }
         // Place the new tile
-        newBoard[`${x},${y}`] = tile;
+        updatedBoard[`${x},${y}`] = tile;
         // Take the tile from the player's tiles
-        const newTiles = player.tiles.filter((t) => t.id !== tile.id);
-        return { ...player, board: newBoard, tiles: newTiles };
+        const updatedPlayerTiles = player.tiles.filter((t) => t.id !== tile.id);
+        return { ...player, board: updatedBoard, tiles: updatedPlayerTiles };
       }),
     });
   },
@@ -77,11 +79,16 @@ export const useGameStore = create<GameState>((set, get) => ({
         const tilePositionKey = Object.keys(player.board).find(
           (key) => player.board[key]?.id === tile.id,
         );
+        // If tile is not on the board, it may be coming from the tile rack
         if (!tilePositionKey)
-          throw new Error("Tile not found on board - this shouldn't happen");
-        const newBoard = { ...player.board };
-        delete newBoard[tilePositionKey];
-        return { ...player, board: newBoard, tiles: [...player.tiles, tile] };
+          return player; // No change if tile not found on board
+        const updatedBoard = { ...player.board };
+        delete updatedBoard[tilePositionKey];
+        return {
+          ...player,
+          board: updatedBoard,
+          tiles: [...player.tiles, tile],
+        };
       }),
     }));
   },
@@ -97,14 +104,73 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   startGame: () => {
     set((state) => {
-      const newPool = [...state.letterPool];
+      const updatedLetterPool = [...state.letterPool];
       const updatedPlayers = state.players.map((player) => {
         // Can take tiles from the start of the pool since the pool is shuffled
-        const initialTileCount = 21;
-        const initialPlayerTiles = newPool.splice(0, initialTileCount);
+        const initialTileCount = 3;
+        const initialPlayerTiles = updatedLetterPool.splice(
+          0,
+          initialTileCount,
+        );
         return { ...player, tiles: initialPlayerTiles };
       });
-      return { players: updatedPlayers, letterPool: newPool };
+      console.log("Game started with players:", updatedPlayers);
+      console.log("Updated letter pool:", updatedLetterPool);
+      return { players: updatedPlayers, letterPool: updatedLetterPool };
+    });
+  },
+
+  peel: (playerId) => {
+    set((state) => {
+      const player = state.players.find((player) => player.id === playerId);
+      if (!player) throw new Error(`Player not found for peel: ${playerId}`);
+      if (player.tiles.length > 0) {
+        console.log("Cannot peel: player still has tiles");
+        return state;
+      }
+      //TODO check if the player's board is valid (dictionary check, etc.)
+      if (state.letterPool.length < state.players.length) {
+        console.log("Game over! Winner:", playerId);
+        return state;
+      }
+
+      const updatedLetterPool = [...state.letterPool];
+      const updatedPlayers = state.players.map((player) => {
+        const tileIdx = Math.floor(Math.random() * updatedLetterPool.length);
+        const peeledTile = updatedLetterPool.splice(tileIdx, 1)[0];
+        return { ...player, tiles: [...player.tiles, peeledTile] };
+      });
+      return { players: updatedPlayers, letterPool: updatedLetterPool };
+    });
+  },
+
+  dump: (playerId, dumpedTile) => {
+    set((state) => {
+      if (state.letterPool.length < 3) {
+        console.log("Cannot dump: not enough tiles left");
+        return state;
+      }
+      const player = state.players.find((player) => player.id === playerId);
+      if (!player) throw new Error(`Player not found for dump: ${playerId}`);
+      // Remove the tile from the player's tiles
+      const updatedPlayerTiles = player.tiles.filter(
+        (tile) => tile.id !== dumpedTile.id,
+      );
+      // Randomly select 3 tiles from the pool
+      const updatedLetterPool = [...state.letterPool];
+      const drawnTiles: TileType[] = [];
+      for (let i = 0; i < 3; i++) {
+        const tileIdx = Math.floor(Math.random() * updatedLetterPool.length);
+        drawnTiles.push(updatedLetterPool.splice(tileIdx, 1)[0]);
+      }
+      // Add the dumped tile to the pool (after drawing)
+      updatedLetterPool.push(dumpedTile);
+      const updatedPlayers = state.players.map((player) =>
+        player.id === playerId
+          ? { ...player, tiles: [...updatedPlayerTiles, ...drawnTiles] }
+          : player,
+      );
+      return { players: updatedPlayers, letterPool: updatedLetterPool };
     });
   },
 }));

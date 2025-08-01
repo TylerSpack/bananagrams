@@ -22,11 +22,26 @@ React Compiler is enabled in this project to optimize performance and reduce the
 - Do not use `useMemo`, `useCallback`, or `React.memo` unless profiling clearly shows a need.
 - Let the compiler automatically apply memoization based on usage.
 
+
 ### Follow the Rules of React
 - Always call hooks at the top level of function components.
 - Never conditionally call hooks.
 - Treat props and state as immutable.
 - Avoid any side effects in render or hook bodies. Place those in `useEffect` or `useLayoutEffect`.
+
+### Be Careful with Effects and Strict Mode
+- React 18+ Strict Mode intentionally double-invokes certain lifecycle methods (including `useEffect` on mount) in development to help catch side effects that aren't idempotent. This can cause initialization logic (such as game setup, API calls, or state resets) to run twice in development, but only once in production.
+- To avoid bugs from double-initialization, always make effect logic idempotent, or use a `useRef` guard to ensure the effect only runs once per session. For example:
+  ```tsx
+  const hasInitialized = useRef(false);
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      // initialization logic
+      hasInitialized.current = true;
+    }
+  }, []);
+  ```
+- Prefer making store/game logic idempotent when possible, so repeated calls do not cause inconsistent state.
 
 ### Use ESLint to Enforce Compatibility
 - The `eslint-plugin-react-compiler` plugin is enabled.
