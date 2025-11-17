@@ -3,6 +3,7 @@ import type { TileType } from "../types/tile";
 import type { BoardBounds, Player } from "../types/game";
 import { generateId, shuffleArray } from "../utils/utils";
 import { EMPTY_CELLS_AROUND_BOARD, INITIAL_LETTER_POOL } from "./gameConstants";
+import { isWordValid } from "../utils/wordList";
 
 interface GameState {
   players: Player[];
@@ -20,6 +21,7 @@ interface GameState {
   startGame: () => void;
   peel: (playerId: string) => void;
   dump: (playerId: string, tile: TileType) => void;
+  isBoardValid: (playerId: string) => boolean;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -128,6 +130,10 @@ export const useGameStore = create<GameState>((set, get) => ({
         return state;
       }
       //TODO check if the player's board is valid (dictionary check, etc.)
+      if (!state.isBoardValid(playerId)) {
+        console.log("Cannot peel: player's board is invalid");
+        return state;
+      }
       if (state.letterPool.length < state.players.length) {
         console.log("Game over! Winner:", playerId);
         return state;
@@ -151,10 +157,18 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
       const player = state.players.find((player) => player.id === playerId);
       if (!player) throw new Error(`Player not found for dump: ${playerId}`);
-      // Remove the tile from the player's tiles
+      // Remove the tile from the player's tiles (if it exists)
       const updatedPlayerTiles = player.tiles.filter(
         (tile) => tile.id !== dumpedTile.id,
       );
+      // Remove the tile from the player's board (if it exists)
+      const updatedBoard = { ...player.board };
+      for (const tilePositionKey in updatedBoard) {
+        if (updatedBoard[tilePositionKey]?.id === dumpedTile.id) {
+          delete updatedBoard[tilePositionKey];
+          break; // Only one tile on the board should have a matching ID
+        }
+      }
       // Randomly select 3 tiles from the pool
       const updatedLetterPool = [...state.letterPool];
       const drawnTiles: TileType[] = [];
@@ -166,10 +180,96 @@ export const useGameStore = create<GameState>((set, get) => ({
       updatedLetterPool.push(dumpedTile);
       const updatedPlayers = state.players.map((player) =>
         player.id === playerId
-          ? { ...player, tiles: [...updatedPlayerTiles, ...drawnTiles] }
+          ? { ...player, tiles: [...updatedPlayerTiles, ...drawnTiles], board: updatedBoard }
           : player,
       );
       return { players: updatedPlayers, letterPool: updatedLetterPool };
     });
+  },
+
+  // Check the validity of the player's board (valid words and connected)
+  isBoardValid: (playerId: string) => {
+    const { players, boardBounds } = get();
+    const player = players.find((p) => p.id === playerId);
+    if (!player) throw new Error(`Player not found: ${playerId}`);
+    const { board } = player;
+    if (Object.keys(board).length === 0) return false; // Empty board is invalid
+    const { minX, maxX, minY, maxY } = boardBounds;
+
+    // PART 1: Check if all words on the board are valid
+    // Check rows
+    for (let y = minY; y <= maxY; y++) {
+      let tempWord = "";
+      for (let x = minX; x <= maxX; x++) {
+        const cellKey = `${x},${y}`;
+        if (board[cellKey]) {
+          tempWord += board[cellKey].letter;
+        } else if (tempWord.length == 1) {
+          tempWord = ""; // Reset if single letter found (part of a vertical word)
+        } else if (tempWord.length > 1) {
+          if (!isWordValid(tempWord)) {
+            console.log("Invalid word found:", tempWord);
+            return false; // Invalid word
+          }
+          tempWord = ""; // Reset for next word
+        }
+      }
+      if (tempWord.length > 1 && !isWordValid(tempWord)) return false; // Check last word
+    }
+
+    // Check columns
+    for (let x = minX; x <= maxX; x++) {
+      let tempWord = "";
+      for (let y = minY; y <= maxY; y++) {
+        const cellKey = `${x},${y}`;
+        if (board[cellKey]) {
+          tempWord += board[cellKey].letter;
+        } else if (tempWord.length == 1) {
+          tempWord = ""; // Reset if single letter found (part of a horizontal word)
+        } else if (tempWord.length > 1) {
+          if (!isWordValid(tempWord)) {
+            console.log("Invalid word found:", tempWord);
+            return false; // Invalid word
+          }
+          tempWord = ""; // Reset for next word
+        }
+      }
+      if (tempWord.length > 1 && !isWordValid(tempWord)) return false; // Check last word
+    }
+
+    // PART 2: Check if the board is connected
+    const visitedKeys = new Set<string>();
+    const stack: string[] = [];
+    const startKey = Object.keys(board)[0];
+    if (!startKey) return false; // No tiles on the board
+    stack.push(startKey);
+    while (stack.length > 0) {
+      const currentKey = stack.pop()!;
+      if (visitedKeys.has(currentKey)) continue;
+      visitedKeys.add(currentKey);
+
+      const [x, y] = currentKey.split(",").map(Number);
+      // Check all 4 directions
+      for (const [dx, dy] of [
+        [1, 0], // Right
+        [-1, 0], // Left
+        [0, 1], // Down
+        [0, -1], // Up
+      ]) {
+        const neighborKey = `${x + dx},${y + dy}`;
+        if (board[neighborKey]) {
+          stack.push(neighborKey);
+        }
+      }
+    }
+    // Check if all tiles are visited
+    for (const key in board) {
+      if (!visitedKeys.has(key)) {
+        console.log("Board is not connected, missing tile:", key);
+        return false; // Not all tiles are connected
+      }
+    }
+
+    return true; // All words are valid and the board is connected
   },
 }));

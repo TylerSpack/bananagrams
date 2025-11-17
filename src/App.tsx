@@ -13,6 +13,7 @@ const App = () => {
   useEffect(() => {
     if (!hasStarted.current) {
       startGame();
+      loadWordList();
       hasStarted.current = true;
     }
   }, [startGame]);
@@ -27,7 +28,6 @@ const App = () => {
         behavior: "auto",
       });
     }
-    loadWordList();
   }, []);
 
   return (

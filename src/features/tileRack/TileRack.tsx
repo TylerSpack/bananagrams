@@ -192,13 +192,14 @@ export const TileRack: React.FC = () => {
             )}
           </div>
           {/* Peel and Dump area */}
-          <div className="flex flex-row gap-2 mt-2 md:flex-col md:items-center md:justify-center">
+          <div className="mt-2 flex flex-row gap-2 md:flex-col md:items-center md:justify-center">
             <button
               className="rounded bg-green-500 px-3 py-1 font-semibold text-white transition hover:bg-green-600"
               onClick={() => peel(yourPlayerId)}
             >
               Peel
             </button>
+
             <div
               ref={dumpAreaRef}
               className="flex flex-1 flex-col items-center justify-center rounded-lg border-2 border-dashed border-black/30 bg-black/10 p-2 text-center"
