@@ -6,7 +6,10 @@ let wordSet: Set<string> | null = null;
  */
 export async function loadWordList(): Promise<void> {
   if (wordSet) return;
-  const response = await fetch('/src/assets/word_list.txt');
+  // Use a base-aware URL so the asset resolves correctly in dev and when a
+  // custom base (like a GitHub Pages homepage) is configured.
+  const url = new URL('../assets/word_list.txt', import.meta.url).href;
+  const response = await fetch(url);
   const text = await response.text();
   wordSet = new Set(text.split('\n'));
 }

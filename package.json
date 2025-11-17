@@ -11,7 +11,7 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
-  "homepage": "https://TylerSpack.github.io/bananagrams/",
+  "homepage": "https://tylerspack.github.io/bananagrams/",
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.4",
     "@tailwindcss/vite": "^4.1.11",
