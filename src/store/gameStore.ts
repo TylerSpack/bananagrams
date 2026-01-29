@@ -53,8 +53,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     else if (maxY - y < EMPTY_CELLS_AROUND_BOARD)
       maxY += EMPTY_CELLS_AROUND_BOARD - (maxY - y);
 
+    const newBoardBounds = minX !== boardBounds.minX || maxX !== boardBounds.maxX || minY !== boardBounds.minY || maxY !== boardBounds.maxY ?
+      { minX, maxX, minY, maxY } : boardBounds;
+
     set({
-      boardBounds: { minX, maxX, minY, maxY },
+      boardBounds: newBoardBounds,
       players: players.map((player) => {
         if (player.id !== playerId) return player;
         const updatedBoard = { ...player.board };

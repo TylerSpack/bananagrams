@@ -9,7 +9,7 @@ const ROWS_PER_PAGE = 3;
 const ARROW_WIDTH = 40; // Width of each arrow button
 const HORIZONTAL_PADDING = 32; // px-4 = 16px on each side
 
-export const TileRack: React.FC = () => {
+export const TileRack = () => {
   const yourPlayerId = useGameStore((state) => state.yourPlayerId);
   const peel = useGameStore((state) => state.peel);
   const dump = useGameStore((state) => state.dump);

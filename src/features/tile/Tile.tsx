@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import type { TileType } from "../../types/tile";
 
@@ -8,11 +8,11 @@ export type TileComponentProps = {
   size?: number; // Optional size prop in pixels
 };
 
-export const Tile: React.FC<TileComponentProps> = ({
+export const Tile = ({
   tileId,
   letter,
   size = 48,
-}) => {
+}: TileComponentProps) => {
   const draggableRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
