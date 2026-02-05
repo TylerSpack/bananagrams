@@ -10,6 +10,8 @@ interface GameState {
   yourPlayerId: string;
   boardBounds: BoardBounds;
   letterPool: TileType[];
+  selectedTileId: string | null;
+  selectTile: (tileId: string) => void;
   placeTileOnBoard: (
     playerId: string,
     x: number,
@@ -28,6 +30,17 @@ export const useGameStore = create<GameState>((set, get) => ({
   boardBounds: { minX: -12, maxX: 12, minY: -12, maxY: 12 },
   letterPool: shuffleArray([...INITIAL_LETTER_POOL]),
   // TODO Get rid of initial player and yourPlayerId
+  selectedTileId: null,
+  selectTile: (tileId: string) => {
+    console.log("Tile selected:", tileId);
+    const { selectedTileId } = get();
+    if (selectedTileId === tileId) {
+      // Deselect if the same tile is selected again
+      set({ selectedTileId: null });
+      return;
+    }
+    set({ selectedTileId: tileId });
+  },
   players: [
     {
       id: "bob-id",
@@ -53,8 +66,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     else if (maxY - y < EMPTY_CELLS_AROUND_BOARD)
       maxY += EMPTY_CELLS_AROUND_BOARD - (maxY - y);
 
-    const newBoardBounds = minX !== boardBounds.minX || maxX !== boardBounds.maxX || minY !== boardBounds.minY || maxY !== boardBounds.maxY ?
-      { minX, maxX, minY, maxY } : boardBounds;
+    const newBoardBounds =
+      minX !== boardBounds.minX ||
+      maxX !== boardBounds.maxX ||
+      minY !== boardBounds.minY ||
+      maxY !== boardBounds.maxY
+        ? { minX, maxX, minY, maxY }
+        : boardBounds;
 
     set({
       boardBounds: newBoardBounds,
@@ -78,23 +96,32 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   // Tile goes from your board -> your tiles
   moveTileToPlayerTiles: (playerId, tile) => {
-    set((state) => ({
-      players: state.players.map((player) => {
-        if (player.id !== playerId) return player;
-        const tilePositionKey = Object.keys(player.board).find(
-          (key) => player.board[key]?.id === tile.id,
-        );
-        // If tile is not on the board, it may be coming from the tile rack
-        if (!tilePositionKey) return player; // No change if tile not found on board
-        const updatedBoard = { ...player.board };
-        delete updatedBoard[tilePositionKey];
-        return {
-          ...player,
-          board: updatedBoard,
-          tiles: [...player.tiles, tile],
-        };
-      }),
-    }));
+    const { players } = get();
+    const player = players.find((p) => p.id === playerId);
+    if (!player) return; // nothing to do if player not found
+
+    const tilePositionKey = Object.keys(player.board).find(
+      (key) => player.board[key]?.id === tile.id,
+    );
+    // If tile is not on the board, no state change is necessary
+    if (!tilePositionKey) return;
+
+    const updatedBoard = { ...player.board };
+    delete updatedBoard[tilePositionKey];
+    
+    // Deselect the tile if it was selected
+    const { selectedTileId } = get();
+    if (selectedTileId === tile.id) {
+      set({ selectedTileId: null });
+    }
+
+    const updatedPlayers = players.map((player) =>
+      player.id === playerId
+        ? { ...player, board: updatedBoard, tiles: [...player.tiles, tile] }
+        : player,
+    );
+
+    set({ players: updatedPlayers });
   },
 
   initializePlayer: (name) => {
@@ -172,6 +199,11 @@ export const useGameStore = create<GameState>((set, get) => ({
           break; // Only one tile on the board should have a matching ID
         }
       }
+      // Deselect the dumped tile if it was selected
+      const { selectedTileId } = get();
+      if (selectedTileId === dumpedTile.id) {
+        set({ selectedTileId: null });
+      }
       // Randomly select 3 tiles from the pool
       const updatedLetterPool = [...state.letterPool];
       const drawnTiles: TileType[] = [];
@@ -183,7 +215,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       updatedLetterPool.push(dumpedTile);
       const updatedPlayers = state.players.map((player) =>
         player.id === playerId
-          ? { ...player, tiles: [...updatedPlayerTiles, ...drawnTiles], board: updatedBoard }
+          ? {
+              ...player,
+              tiles: [...updatedPlayerTiles, ...drawnTiles],
+              board: updatedBoard,
+            }
           : player,
       );
       return { players: updatedPlayers, letterPool: updatedLetterPool };

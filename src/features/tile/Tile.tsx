@@ -6,12 +6,16 @@ export type TileComponentProps = {
   tileId: string;
   letter: string;
   size?: number; // Optional size prop in pixels
+  selectTile: (tileId: string) => void;
+  isTileSelected: boolean;
 };
 
 export const Tile = ({
   tileId,
   letter,
   size = 48,
+  selectTile,
+  isTileSelected,
 }: TileComponentProps) => {
   const draggableRef = useRef<HTMLDivElement | null>(null);
 
@@ -38,6 +42,12 @@ export const Tile = ({
         width: `${size}px`,
         height: `${size}px`,
         fontSize: `${fontSize}px`,
+        boxShadow: isTileSelected
+          ? "0 0 0 4px rgba(59, 130, 246, 0.5)" // Blue glow for selected tile
+          : "0 1px 3px rgba(0, 0, 0, 0.1)", // Default shadow
+      }}
+      onClick={() => {
+        selectTile(tileId);
       }}
     >
       {letter}

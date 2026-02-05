@@ -8,13 +8,13 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary
       fallbackRender={({ error }) => (
-        <div className="flex h-screen flex-col items-center justify-center">
+        <div className="flex h-screen flex-col items-center justify-center p-4">
           <h1 className="mb-4 text-2xl font-bold text-red-600">
             Something went wrong.
           </h1>
-          <pre className="rounded bg-red-100 p-4 text-red-800">
+          <span className="w-full rounded bg-red-100 p-4 text-red-800">
             {error.message}
-          </pre>
+          </span>
         </div>
       )}
     >

@@ -20,6 +20,8 @@ export const TileRack = () => {
     (state) => state.moveTileToPlayerTiles,
   );
   const letterPool = useGameStore((state) => state.letterPool);
+  const selectTile = useGameStore((state) => state.selectTile);
+  const selectedTileId = useGameStore((state) => state.selectedTileId);
   if (!tiles) throw new Error("Your player not found in game store");
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -160,6 +162,8 @@ export const TileRack = () => {
                       tileId={tile.id}
                       letter={tile.letter}
                       size={TILE_SIZE}
+                      selectTile={selectTile}
+                      isTileSelected={selectedTileId === tile.id}
                     />
                   ))}
                 </div>

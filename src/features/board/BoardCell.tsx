@@ -22,6 +22,8 @@ export const BoardCell = ({
     const player = s.players.find((p) => p.id === s.yourPlayerId);
     return player?.board[cellKey];
   });
+  const selectTile = useGameStore((state) => state.selectTile);
+  const selectedTileId = useGameStore((state) => state.selectedTileId);
 
   // Drop target for the cell
   useEffect(() => {
@@ -43,6 +45,9 @@ export const BoardCell = ({
     return cleanup;
   }, [tile, row, col, placeTileOnBoard, yourPlayerId]);
 
+  if (tile)
+    console.log(`Rendering BoardCell at (${col}, ${row}) with tile id:`, tile.id);
+
   return (
     <div
       ref={ref}
@@ -50,7 +55,7 @@ export const BoardCell = ({
       style={{ width: BOARD_CELL_SIZE, height: BOARD_CELL_SIZE }}
     >
       {tile ? (
-        <Tile tileId={tile.id} letter={tile.letter} size={BOARD_CELL_SIZE - 4} />
+        <Tile key={tile.id} tileId={tile.id} letter={tile.letter} size={BOARD_CELL_SIZE - 4} selectTile={selectTile} isTileSelected={selectedTileId === tile.id} />
       ) : null}
     </div>
   );

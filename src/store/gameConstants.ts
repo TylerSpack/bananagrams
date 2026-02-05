@@ -1,6 +1,8 @@
+import type { TileType } from "../types/tile";
+
 export const EMPTY_CELLS_AROUND_BOARD = 4;
 
-export const INITIAL_LETTER_POOL =
+export const INITIAL_LETTER_POOL: TileType[] =
   "JJKKQQXXZZBBBCCCFFFHHHMMMPPPVVVWWWYYYGGGGLLLLLDDDDDDSSSSSSUUUUUUNNNNNNNNTTTTTTTTTRRRRRRRRROOOOOOOOOOOIIIIIIIIIIIIAAAAAAAAAAAAAEEEEEEEEEEEEEEEEEE"
     .split("")
     .map((letter, idx) => ({ id: `${letter}-${idx}`, letter }));
