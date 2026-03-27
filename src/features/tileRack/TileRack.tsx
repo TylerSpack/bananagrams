@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import type { TileType } from "../../types/tile";
 import { useGameStore } from "../../store/gameStore";
+import { useNetworkSessionStore } from "../../network/networkSessionStore";
 
 const TILE_SIZE = 48; // Fixed tile size in pixels (h-12 w-12 equivalent)
 const ROWS_PER_PAGE = 3;
@@ -10,19 +11,22 @@ const ARROW_WIDTH = 40; // Width of each arrow button
 const HORIZONTAL_PADDING = 32; // px-4 = 16px on each side
 
 export const TileRack = () => {
-  const yourPlayerId = useGameStore((state) => state.yourPlayerId);
+  const yourPlayerId = useNetworkSessionStore((state) => state.localPeerId);
   const peel = useGameStore((state) => state.peel);
   const dump = useGameStore((state) => state.dump);
-  const tiles = useGameStore(
-    (state) => state.players.find((p) => p.id === yourPlayerId)?.tiles,
-  );
+  const tiles = useGameStore((state) => {
+    if (!yourPlayerId) {
+      return [];
+    }
+
+    return state.players[yourPlayerId]?.tiles ?? [];
+  });
   const moveTileToPlayerTiles = useGameStore(
     (state) => state.moveTileToPlayerTiles,
   );
   const letterPool = useGameStore((state) => state.letterPool);
   const selectTile = useGameStore((state) => state.selectTile);
   const selectedTileId = useGameStore((state) => state.selectedTileId);
-  if (!tiles) throw new Error("Your player not found in game store");
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -92,7 +96,8 @@ export const TileRack = () => {
       onDrop: ({ source }) => {
         const droppedTile = source.data as TileType | undefined;
         if (!droppedTile) return;
-        moveTileToPlayerTiles(yourPlayerId, droppedTile);
+        if (!yourPlayerId) return;
+        moveTileToPlayerTiles(yourPlayerId, droppedTile.id);
       },
     });
     return cleanup;
@@ -108,7 +113,8 @@ export const TileRack = () => {
       onDrop: ({ source }) => {
         const droppedTile = source.data as TileType | undefined;
         if (!droppedTile) return;
-        dump(yourPlayerId, droppedTile);
+        if (!yourPlayerId) return;
+        dump(yourPlayerId, droppedTile.id);
       },
     });
     return cleanup;
@@ -199,7 +205,10 @@ export const TileRack = () => {
           <div className="mt-2 flex flex-row gap-2 md:flex-col md:items-center md:justify-center">
             <button
               className="rounded bg-green-500 px-3 py-1 font-semibold text-white transition hover:bg-green-600"
-              onClick={() => peel(yourPlayerId)}
+              onClick={() => {
+                if (!yourPlayerId) return;
+                peel(yourPlayerId);
+              }}
             >
               Peel
             </button>

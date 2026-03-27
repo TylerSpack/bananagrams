@@ -1,314 +1,403 @@
 import { create } from "zustand";
+import {
+  isPlayerScopedAction,
+  type GameAction,
+  type GameSyncState,
+} from "../network/gameMessages";
+import { useNetworkSessionStore } from "../network/networkSessionStore";
+import {
+  canPlayerPeel,
+  findAndRemoveTile,
+  giveAllPlayersNewTile,
+  moveTileToPlayerTiles as moveTileToRackForPlayer,
+  placeTileOnBoard as placeTileForPlayer,
+} from "../gameLogic";
+import type { BoardBounds, Player, Players } from "../types/game";
 import type { TileType } from "../types/tile";
-import type { BoardBounds, Player } from "../types/game";
-import { generateId, shuffleArray } from "../utils/utils";
-import { EMPTY_CELLS_AROUND_BOARD, INITIAL_LETTER_POOL } from "./gameConstants";
-import { isWordValid } from "../utils/wordList";
+import { shuffleArray } from "../utils/utils";
+import { loadWordList, wordSet } from "../utils/wordList";
+import { INITIAL_LETTER_POOL } from "./gameConstants";
 
-interface GameState {
-  players: Player[];
-  yourPlayerId: string;
-  boardBounds: BoardBounds;
+const DEFAULT_BOARD_BOUNDS: BoardBounds = {
+  minX: -12,
+  maxX: 12,
+  minY: -12,
+  maxY: 12,
+};
+
+if (wordSet === null) {
+  loadWordList();
+}
+
+const createEmptyPlayer = (playerId: string): Player => ({
+  name: playerId,
+  tiles: [],
+  board: {},
+});
+
+export interface GameState {
+  players: Players;
   letterPool: TileType[];
+  hasGameStarted: boolean;
+  setHasGameStarted: (started: boolean) => void;
+  boardBounds: BoardBounds;
   selectedTileId: string | null;
   selectTile: (tileId: string) => void;
   placeTileOnBoard: (
     playerId: string,
     x: number,
     y: number,
-    tile: TileType,
+    tileId: string,
   ) => void;
-  moveTileToPlayerTiles: (playerId: string, tile: TileType) => void;
-  initializePlayer: (name: string) => void;
-  startGame: () => void;
+  moveTileToPlayerTiles: (playerId: string, tileId: string) => void;
+  startGame: (playerIds: string[]) => void;
   peel: (playerId: string) => void;
-  dump: (playerId: string, tile: TileType) => void;
-  isBoardValid: (playerId: string) => boolean;
+  dump: (playerId: string, tileId: string) => void;
+  handleNetworkAction: (action: GameAction, fromPeerId: string) => void;
+  applySyncState: (gameState: GameSyncState) => void;
+  getSyncState: () => GameSyncState;
+  resetGame: () => void;
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
-  boardBounds: { minX: -12, maxX: 12, minY: -12, maxY: 12 },
-  letterPool: shuffleArray([...INITIAL_LETTER_POOL]),
-  // TODO Get rid of initial player and yourPlayerId
-  selectedTileId: null,
-  selectTile: (tileId: string) => {
-    console.log("Tile selected:", tileId);
-    const { selectedTileId } = get();
-    if (selectedTileId === tileId) {
-      // Deselect if the same tile is selected again
-      set({ selectedTileId: null });
+const buildSyncState = (
+  state: Pick<
+    GameState,
+    "players" | "letterPool" | "boardBounds" | "hasGameStarted"
+  >,
+): GameSyncState => ({
+  players: state.players,
+  letterPool: state.letterPool,
+  boardBounds: state.boardBounds,
+  hasGameStarted: state.hasGameStarted,
+});
+
+export const useGameStore = create<GameState>((set, get) => {
+  const applyPlaceTileLocally = (
+    playerId: string,
+    x: number,
+    y: number,
+    tileId: string,
+  ) => {
+    const { boardBounds, players } = get();
+    const player = players[playerId];
+    if (!player) {
       return;
     }
-    set({ selectedTileId: tileId });
-  },
-  players: [
-    {
-      id: "bob-id",
-      name: "Bob",
-      tiles: [],
-      board: {},
-    },
-  ],
-  yourPlayerId: "bob-id",
 
-  // Tile goes from your tiles -> your board
-  placeTileOnBoard: (playerId, x, y, tile) => {
-    const { boardBounds, players } = get();
+    const placement = placeTileForPlayer(player, tileId, x, y, boardBounds);
+    if (!placement) {
+      console.warn(
+        `Cannot place tile. Tile ${tileId} not found for player ${playerId}.`,
+      );
+      return;
+    }
 
-    // Ensure the board bounds are expanded if necessary
-    let { minX, maxX, minY, maxY } = boardBounds;
-    if (x - minX < EMPTY_CELLS_AROUND_BOARD)
-      minX -= EMPTY_CELLS_AROUND_BOARD - (x - minX);
-    else if (maxX - x < EMPTY_CELLS_AROUND_BOARD)
-      maxX += EMPTY_CELLS_AROUND_BOARD - (maxX - x);
-    if (y - minY < EMPTY_CELLS_AROUND_BOARD)
-      minY -= EMPTY_CELLS_AROUND_BOARD - (y - minY);
-    else if (maxY - y < EMPTY_CELLS_AROUND_BOARD)
-      maxY += EMPTY_CELLS_AROUND_BOARD - (maxY - y);
-
-    const newBoardBounds =
-      minX !== boardBounds.minX ||
-      maxX !== boardBounds.maxX ||
-      minY !== boardBounds.minY ||
-      maxY !== boardBounds.maxY
-        ? { minX, maxX, minY, maxY }
-        : boardBounds;
+    const { updatedPlayer, updatedBoardBounds } = placement;
 
     set({
-      boardBounds: newBoardBounds,
-      players: players.map((player) => {
-        if (player.id !== playerId) return player;
-        const updatedBoard = { ...player.board };
-        for (const tilePositionKey in updatedBoard) {
-          if (updatedBoard[tilePositionKey]?.id === tile.id) {
-            delete updatedBoard[tilePositionKey];
-            break; // Only one tile on the board should have a matching ID
-          }
-        }
-        // Place the new tile
-        updatedBoard[`${x},${y}`] = tile;
-        // Take the tile from the player's tiles
-        const updatedPlayerTiles = player.tiles.filter((t) => t.id !== tile.id);
-        return { ...player, board: updatedBoard, tiles: updatedPlayerTiles };
-      }),
+      boardBounds: updatedBoardBounds,
+      players: {
+        ...players,
+        [playerId]: updatedPlayer,
+      },
+      selectedTileId: null,
     });
-  },
+  };
 
-  // Tile goes from your board -> your tiles
-  moveTileToPlayerTiles: (playerId, tile) => {
+  const applyMoveTileToRackLocally = (playerId: string, tileId: string) => {
     const { players } = get();
-    const player = players.find((p) => p.id === playerId);
-    if (!player) return; // nothing to do if player not found
-
-    const tilePositionKey = Object.keys(player.board).find(
-      (key) => player.board[key]?.id === tile.id,
-    );
-    // If tile is not on the board, no state change is necessary
-    if (!tilePositionKey) return;
-
-    const updatedBoard = { ...player.board };
-    delete updatedBoard[tilePositionKey];
-    
-    // Deselect the tile if it was selected
-    const { selectedTileId } = get();
-    if (selectedTileId === tile.id) {
-      set({ selectedTileId: null });
+    const player = players[playerId];
+    if (!player) {
+      return;
     }
 
-    const updatedPlayers = players.map((player) =>
-      player.id === playerId
-        ? { ...player, board: updatedBoard, tiles: [...player.tiles, tile] }
-        : player,
+    const updatedPlayer = moveTileToRackForPlayer(player, tileId);
+    if (!updatedPlayer) {
+      return;
+    }
+
+    set({
+      players: {
+        ...players,
+        [playerId]: updatedPlayer,
+      },
+      selectedTileId: null,
+    });
+  };
+
+  const applyStartGameLocally = (playerIds: string[]) => {
+    if (playerIds.length === 0) {
+      return;
+    }
+
+    set((state) => {
+      const nextLetterPool = shuffleArray([...INITIAL_LETTER_POOL]);
+      const nextPlayers: Players = {};
+
+      for (const playerId of playerIds) {
+        const initialTiles = nextLetterPool.splice(0, 21);
+        const existingPlayer =
+          state.players[playerId] ?? createEmptyPlayer(playerId);
+
+        nextPlayers[playerId] = {
+          ...existingPlayer,
+          tiles: initialTiles,
+          board: {},
+        };
+      }
+
+      return {
+        players: nextPlayers,
+        letterPool: nextLetterPool,
+        hasGameStarted: true,
+        boardBounds: { ...DEFAULT_BOARD_BOUNDS },
+        selectedTileId: null,
+      };
+    });
+  };
+
+  const applyPeelLocally = (playerId: string) => {
+    const state = get();
+    const player = state.players[playerId];
+    if (!player) {
+      console.warn(`Cannot peel. Player ${playerId} was not found.`);
+      return;
+    }
+
+    if (!canPlayerPeel(player, state.boardBounds)) {
+      console.log("Cannot peel: player's board is invalid");
+      return;
+    }
+
+    const playerCount = Object.keys(state.players).length;
+    if (state.letterPool.length < playerCount) {
+      console.log("Game over! Winner:", playerId);
+      return;
+    }
+
+    const { updatedPlayers, updatedLetterPool } = giveAllPlayersNewTile(
+      state.players,
+      state.letterPool,
     );
 
-    set({ players: updatedPlayers });
-  },
+    set({ players: updatedPlayers, letterPool: updatedLetterPool });
+  };
 
-  initializePlayer: (name) => {
-    set((state) => ({
-      players: [
-        ...state.players,
-        { id: generateId(), name, tiles: [], board: {} },
-      ],
-    }));
-  },
+  const applyDumpLocally = (playerId: string, tileId: string) => {
+    const state = get();
+    const player = state.players[playerId];
+    if (!player) {
+      console.warn(`Cannot dump. Player ${playerId} was not found.`);
+      return;
+    }
 
-  startGame: () => {
-    set((state) => {
-      const updatedLetterPool = [...state.letterPool];
-      const updatedPlayers = state.players.map((player) => {
-        // Can take tiles from the start of the pool since the pool is shuffled
-        const initialTileCount = 21;
-        const initialPlayerTiles = updatedLetterPool.splice(
-          0,
-          initialTileCount,
-        );
-        return { ...player, tiles: initialPlayerTiles };
-      });
-      console.log("Game started with players:", updatedPlayers);
-      console.log("Updated letter pool:", updatedLetterPool);
-      return { players: updatedPlayers, letterPool: updatedLetterPool };
-    });
-  },
+    if (state.letterPool.length < 3) {
+      console.log("Cannot dump: not enough tiles left");
+      return;
+    }
 
-  peel: (playerId) => {
-    set((state) => {
-      const player = state.players.find((player) => player.id === playerId);
-      if (!player) throw new Error(`Player not found for peel: ${playerId}`);
-      if (player.tiles.length > 0) {
-        console.log("Cannot peel: player still has tiles");
-        return state;
-      }
-      //TODO check if the player's board is valid (dictionary check, etc.)
-      if (!state.isBoardValid(playerId)) {
-        console.log("Cannot peel: player's board is invalid");
-        return state;
-      }
-      if (state.letterPool.length < state.players.length) {
-        console.log("Game over! Winner:", playerId);
-        return state;
-      }
-
-      const updatedLetterPool = [...state.letterPool];
-      const updatedPlayers = state.players.map((player) => {
-        const tileIdx = Math.floor(Math.random() * updatedLetterPool.length);
-        const peeledTile = updatedLetterPool.splice(tileIdx, 1)[0];
-        return { ...player, tiles: [...player.tiles, peeledTile] };
-      });
-      return { players: updatedPlayers, letterPool: updatedLetterPool };
-    });
-  },
-
-  dump: (playerId, dumpedTile) => {
-    set((state) => {
-      if (state.letterPool.length < 3) {
-        console.log("Cannot dump: not enough tiles left");
-        return state;
-      }
-      const player = state.players.find((player) => player.id === playerId);
-      if (!player) throw new Error(`Player not found for dump: ${playerId}`);
-      // Remove the tile from the player's tiles (if it exists)
-      const updatedPlayerTiles = player.tiles.filter(
-        (tile) => tile.id !== dumpedTile.id,
+    const { tile: tileToDump, updatedPlayer } = findAndRemoveTile(
+      player,
+      tileId,
+    );
+    if (!tileToDump) {
+      console.warn(
+        `Cannot dump. Tile ${tileId} was not found for player ${playerId}.`,
       );
-      // Remove the tile from the player's board (if it exists)
-      const updatedBoard = { ...player.board };
-      for (const tilePositionKey in updatedBoard) {
-        if (updatedBoard[tilePositionKey]?.id === dumpedTile.id) {
-          delete updatedBoard[tilePositionKey];
-          break; // Only one tile on the board should have a matching ID
-        }
+      return;
+    }
+
+    const updatedLetterPool = [...state.letterPool];
+    const drawnTiles: TileType[] = [];
+    for (let i = 0; i < 3; i++) {
+      const tileIdx = Math.floor(Math.random() * updatedLetterPool.length);
+      drawnTiles.push(updatedLetterPool.splice(tileIdx, 1)[0]);
+    }
+    updatedPlayer.tiles.push(...drawnTiles);
+    updatedLetterPool.push(tileToDump);
+
+    set({
+      players: {
+        ...state.players,
+        [playerId]: updatedPlayer,
+      },
+      letterPool: updatedLetterPool,
+      selectedTileId: null,
+    });
+  };
+
+  const broadcastSyncIfSharedStateChanged = (
+    previousPlayers: Players,
+    previousLetterPool: TileType[],
+  ) => {
+    const nextState = get();
+    if (
+      previousPlayers === nextState.players &&
+      previousLetterPool === nextState.letterPool
+    ) {
+      return;
+    }
+
+    useNetworkSessionStore.getState().broadcastToGuests({
+      type: "SYNC_STATE",
+      gameState: nextState.getSyncState(),
+    });
+  };
+
+  const applyHostAction = (action: GameAction) => {
+    const previousPlayers = get().players;
+    const previousLetterPool = get().letterPool;
+
+    switch (action.type) {
+      case "START_GAME":
+        applyStartGameLocally(action.playerIds);
+        break;
+      case "PLACE_TILE":
+        applyPlaceTileLocally(
+          action.playerId,
+          action.x,
+          action.y,
+          action.tileId,
+        );
+        break;
+      case "RETURN_TILE":
+        applyMoveTileToRackLocally(action.playerId, action.tileId);
+        break;
+      case "PEEL_REQUEST":
+        applyPeelLocally(action.playerId);
+        break;
+      case "DUMP_REQUEST":
+        applyDumpLocally(action.playerId, action.tileId);
+        break;
+      case "SYNC_STATE":
+        return;
+      default:
+        return;
+    }
+
+    broadcastSyncIfSharedStateChanged(previousPlayers, previousLetterPool);
+  };
+
+  const sendGuestActionToHost = (action: GameAction) => {
+    const accepted = useNetworkSessionStore.getState().sendToHost(action);
+    if (!accepted) {
+      console.warn(
+        `Could not send action ${action.type}. Host connection is not ready yet.`,
+      );
+    }
+  };
+
+  const dispatchLocalAction = (action: GameAction) => {
+    const { role } = useNetworkSessionStore.getState();
+
+    if (role === "host") {
+      applyHostAction(action);
+      return;
+    }
+
+    if (role === "guest") {
+      if (action.type === "START_GAME" || action.type === "SYNC_STATE") {
+        return;
       }
-      // Deselect the dumped tile if it was selected
-      const { selectedTileId } = get();
-      if (selectedTileId === dumpedTile.id) {
+
+      sendGuestActionToHost(action);
+
+      if (
+        action.type === "PLACE_TILE" ||
+        action.type === "RETURN_TILE" ||
+        action.type === "DUMP_REQUEST"
+      ) {
         set({ selectedTileId: null });
       }
-      // Randomly select 3 tiles from the pool
-      const updatedLetterPool = [...state.letterPool];
-      const drawnTiles: TileType[] = [];
-      for (let i = 0; i < 3; i++) {
-        const tileIdx = Math.floor(Math.random() * updatedLetterPool.length);
-        drawnTiles.push(updatedLetterPool.splice(tileIdx, 1)[0]);
+
+      return;
+    }
+
+    console.warn(`Ignored action ${action.type}; no room role is active.`);
+  };
+
+  return {
+    players: {},
+    letterPool: [],
+    boardBounds: { ...DEFAULT_BOARD_BOUNDS },
+    selectedTileId: null,
+    hasGameStarted: false,
+    setHasGameStarted: (started: boolean) => set({ hasGameStarted: started }),
+    selectTile: (tileId: string) => {
+      const { selectedTileId } = get();
+      if (selectedTileId === tileId) {
+        set({ selectedTileId: null });
+        return;
       }
-      // Add the dumped tile to the pool (after drawing)
-      updatedLetterPool.push(dumpedTile);
-      const updatedPlayers = state.players.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              tiles: [...updatedPlayerTiles, ...drawnTiles],
-              board: updatedBoard,
-            }
-          : player,
-      );
-      return { players: updatedPlayers, letterPool: updatedLetterPool };
-    });
-  },
 
-  // Check the validity of the player's board (valid words and connected)
-  isBoardValid: (playerId: string) => {
-    const { players, boardBounds } = get();
-    const player = players.find((p) => p.id === playerId);
-    if (!player) throw new Error(`Player not found: ${playerId}`);
-    const { board } = player;
-    if (Object.keys(board).length === 0) return false; // Empty board is invalid
-    const { minX, maxX, minY, maxY } = boardBounds;
+      set({ selectedTileId: tileId });
+    },
 
-    // PART 1: Check if all words on the board are valid
-    // Check rows
-    for (let y = minY; y <= maxY; y++) {
-      let tempWord = "";
-      for (let x = minX; x <= maxX; x++) {
-        const cellKey = `${x},${y}`;
-        if (board[cellKey]) {
-          tempWord += board[cellKey].letter;
-        } else if (tempWord.length == 1) {
-          tempWord = ""; // Reset if single letter found (part of a vertical word)
-        } else if (tempWord.length > 1) {
-          if (!isWordValid(tempWord)) {
-            console.log("Invalid word found:", tempWord);
-            return false; // Invalid word
-          }
-          tempWord = ""; // Reset for next word
+    placeTileOnBoard: (playerId, x, y, tileId) => {
+      dispatchLocalAction({ type: "PLACE_TILE", playerId, x, y, tileId });
+    },
+    moveTileToPlayerTiles: (playerId, tileId) => {
+      dispatchLocalAction({ type: "RETURN_TILE", playerId, tileId });
+    },
+    startGame: (playerIds) => {
+      dispatchLocalAction({
+        type: "START_GAME",
+        playerIds,
+      });
+    },
+    peel: (playerId) => {
+      dispatchLocalAction({ type: "PEEL_REQUEST", playerId });
+    },
+    dump: (playerId, tileId) => {
+      dispatchLocalAction({ type: "DUMP_REQUEST", playerId, tileId });
+    },
+    handleNetworkAction: (action, fromPeerId) => {
+      const { role } = useNetworkSessionStore.getState();
+
+      if (role === "host") {
+        if (action.type === "SYNC_STATE" || action.type === "START_GAME") {
+          return;
         }
-      }
-      if (tempWord.length > 1 && !isWordValid(tempWord)) return false; // Check last word
-    }
 
-    // Check columns
-    for (let x = minX; x <= maxX; x++) {
-      let tempWord = "";
-      for (let y = minY; y <= maxY; y++) {
-        const cellKey = `${x},${y}`;
-        if (board[cellKey]) {
-          tempWord += board[cellKey].letter;
-        } else if (tempWord.length == 1) {
-          tempWord = ""; // Reset if single letter found (part of a horizontal word)
-        } else if (tempWord.length > 1) {
-          if (!isWordValid(tempWord)) {
-            console.log("Invalid word found:", tempWord);
-            return false; // Invalid word
-          }
-          tempWord = ""; // Reset for next word
+        if (isPlayerScopedAction(action) && action.playerId !== fromPeerId) {
+          console.warn(
+            `Ignoring ${action.type} from ${fromPeerId}; payload targeted ${action.playerId}.`,
+          );
+          return;
         }
+
+        applyHostAction(action);
+        return;
       }
-      if (tempWord.length > 1 && !isWordValid(tempWord)) return false; // Check last word
-    }
 
-    // PART 2: Check if the board is connected
-    const visitedKeys = new Set<string>();
-    const stack: string[] = [];
-    const startKey = Object.keys(board)[0];
-    if (!startKey) return false; // No tiles on the board
-    stack.push(startKey);
-    while (stack.length > 0) {
-      const currentKey = stack.pop()!;
-      if (visitedKeys.has(currentKey)) continue;
-      visitedKeys.add(currentKey);
-
-      const [x, y] = currentKey.split(",").map(Number);
-      // Check all 4 directions
-      for (const [dx, dy] of [
-        [1, 0], // Right
-        [-1, 0], // Left
-        [0, 1], // Down
-        [0, -1], // Up
-      ]) {
-        const neighborKey = `${x + dx},${y + dy}`;
-        if (board[neighborKey]) {
-          stack.push(neighborKey);
+      if (role === "guest") {
+        if (action.type !== "SYNC_STATE") {
+          return;
         }
-      }
-    }
-    // Check if all tiles are visited
-    for (const key in board) {
-      if (!visitedKeys.has(key)) {
-        console.log("Board is not connected, missing tile:", key);
-        return false; // Not all tiles are connected
-      }
-    }
 
-    return true; // All words are valid and the board is connected
-  },
-}));
+        get().applySyncState(action.gameState);
+      }
+    },
+    applySyncState: (gameState) => {
+      set({
+        players: gameState.players,
+        letterPool: gameState.letterPool,
+        boardBounds: gameState.boardBounds,
+        hasGameStarted: gameState.hasGameStarted,
+        selectedTileId: null,
+      });
+    },
+    getSyncState: () => {
+      return buildSyncState(get());
+    },
+    resetGame: () => {
+      set({
+        players: {},
+        letterPool: [],
+        boardBounds: { ...DEFAULT_BOARD_BOUNDS },
+        selectedTileId: null,
+        hasGameStarted: false,
+      });
+    },
+  };
+});

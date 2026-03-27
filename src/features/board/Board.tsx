@@ -9,13 +9,7 @@ export const Board = () => {
   for (let y = minY; y <= maxY; y++) {
     const cells = [];
     for (let x = minX; x <= maxX; x++) {
-      cells.push(
-        <BoardCell
-          key={`${x},${y}`}
-          row={y}
-          col={x}
-        />,
-      );
+      cells.push(<BoardCell key={`${x},${y}`} row={y} col={x} />);
     }
     rows.push(
       <div className="flex" key={y}>

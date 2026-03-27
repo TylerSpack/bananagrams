@@ -1,50 +1,41 @@
-import { Board } from "./features/board/Board";
-import { TileRack } from "./features/tileRack/TileRack";
-import { useRef, useEffect } from "react";
-import { useGameStore } from "./store/gameStore";
-import { loadWordList } from "./utils/wordList";
+import { HashRouter, Routes, Route } from "react-router-dom";
+import LobbyPage from "./pages/LobbyPage";
+import GamePage from "./pages/GamePage";
+import { useEffect } from "react";
+import { auth } from "./network/firebaseConfig";
+import { useNetworkSessionStore } from "./network/networkSessionStore";
 
 const App = () => {
-  const boardContainerRef = useRef<HTMLDivElement>(null);
-
-  // TODO Get rid of calling startGame on mount
-  const startGame = useGameStore((state) => state.startGame);
-  const hasStarted = useRef(false);
-  useEffect(() => {
-    if (!hasStarted.current) {
-      startGame();
-      loadWordList();
-      hasStarted.current = true;
-    }
-  }, [startGame]);
+  const playerId = useNetworkSessionStore((state) => state.localPeerId);
+  const setPlayerId = useNetworkSessionStore((state) => state.setLocalPeerId);
 
   useEffect(() => {
-    const container = boardContainerRef.current;
-    if (container) {
-      // Scroll to center both vertically and horizontally
-      container.scrollTo({
-        top: (container.scrollHeight - container.clientHeight) / 2,
-        left: (container.scrollWidth - container.clientWidth) / 2,
-        behavior: "auto",
-      });
-    }
-  }, []);
+    return auth.onAuthStateChanged((user) => {
+      if (user) {
+        setPlayerId(user.uid);
+      } else {
+        setPlayerId(null);
+      }
+    });
+  }, [setPlayerId]);
+
+  if (!playerId) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <p className="text-gray-500">Signing in...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="margin-auto flex h-screen w-screen flex-col bg-gray-50">
-      <header className="my-2 flex items-center justify-center gap-4">
-        <h1 className="text-3xl font-bold text-yellow-700 drop-shadow">
-          Bananagrams
-        </h1>
-      </header>
-      <div
-        ref={boardContainerRef}
-        className="scrollbar-hide flex-1 overflow-scroll p-4"
-      >
-        <Board />
-      </div>
-      <TileRack />
-    </div>
+    <>
+      <HashRouter>
+        <Routes>
+          <Route path="/" element={<LobbyPage />} />
+          <Route path="/game/:roomId" element={<GamePage />} />
+        </Routes>
+      </HashRouter>
+    </>
   );
 };
 
